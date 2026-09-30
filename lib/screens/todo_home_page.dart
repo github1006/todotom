@@ -287,7 +287,7 @@ class _TodoHomePageState extends State<TodoHomePage> with WidgetsBindingObserver
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TodoTom'),
+        title: const Text('Tareas'),
         actions: [
           IconButton(
             onPressed: _openPlaces,

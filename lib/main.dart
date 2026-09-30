@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/app_dependencies.dart';
-import 'screens/todo_home_page.dart';
+import 'screens/main_shell_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +23,7 @@ class TodoTomApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
       ),
-      home: TodoHomePage(dependencies: dependencies),
+      home: MainShellPage(dependencies: dependencies),
     );
   }
 }

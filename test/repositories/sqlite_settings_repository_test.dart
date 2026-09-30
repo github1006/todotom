@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:todotom/models/reminder_sound.dart';
+import 'package:todotom/models/trip_context.dart';
 import 'package:todotom/repositories/sqlite/sqlite_settings_repository.dart';
 
 import '../helpers/test_database.dart';
@@ -49,6 +50,29 @@ void main() {
 
     final sound = await repository.getReminderSound();
     expect(sound.usesSystemPicker, isFalse);
+  });
+
+  test('setLastPackingTripContexts recuerda tipos de viaje', () async {
+    await repository.setLastPackingTripContexts({
+      TripContext.fieldDay,
+      TripContext.cityToField,
+    });
+    final contexts = await repository.getLastPackingTripContexts();
+    expect(contexts, contains(TripContext.fieldDay));
+    expect(contexts, contains(TripContext.cityToField));
+  });
+
+  test('setLastTripDestinationId recuerda destino de maleta', () async {
+    await repository.setLastTripDestinationId('dest_la_paz');
+    expect(await repository.getLastTripDestinationId(), 'dest_la_paz');
+  });
+
+  test('setLastPackingDestinationId recuerda el destino para plantillas', () async {
+    await repository.setLastPackingDestinationId('dest_rayo_rojo');
+    expect(await repository.getLastPackingDestinationId(), 'dest_rayo_rojo');
+
+    await repository.setLastPackingDestinationId(null);
+    expect(await repository.getLastPackingDestinationId(), isNull);
   });
 
   test('wasLegacyDataMigrated es false hasta migrar', () async {

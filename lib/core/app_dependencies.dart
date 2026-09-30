@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 
 import '../database/app_database.dart';
+import '../repositories/packing_repository.dart';
 import '../repositories/place_repository.dart';
 import '../repositories/settings_repository.dart';
+import '../repositories/sqlite/sqlite_packing_repository.dart';
 import '../repositories/sqlite/sqlite_place_repository.dart';
 import '../repositories/sqlite/sqlite_settings_repository.dart';
 import '../repositories/sqlite/sqlite_todo_repository.dart';
@@ -16,6 +18,7 @@ class AppDependencies {
     required this.todoRepository,
     required this.placeRepository,
     required this.settingsRepository,
+    required this.packingRepository,
     required this.reminderService,
   });
 
@@ -23,6 +26,7 @@ class AppDependencies {
   final TodoRepository todoRepository;
   final PlaceRepository placeRepository;
   final SettingsRepository settingsRepository;
+  final PackingRepository packingRepository;
   final ReminderService reminderService;
 
   static AppDependencies? _instance;
@@ -65,6 +69,7 @@ class AppDependencies {
     final todoRepository = SqliteTodoRepository(database);
     final placeRepository = SqlitePlaceRepository(database);
     final settingsRepository = SqliteSettingsRepository(database);
+    final packingRepository = SqlitePackingRepository(database);
 
     if (!skipLegacyMigration) {
       await LegacyDataMigrator(
@@ -84,6 +89,7 @@ class AppDependencies {
       todoRepository: todoRepository,
       placeRepository: placeRepository,
       settingsRepository: settingsRepository,
+      packingRepository: packingRepository,
       reminderService: reminderService,
     );
 
