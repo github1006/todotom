@@ -30,8 +30,38 @@ void main() {
       selectedContexts: {TripContext.fieldDay},
     );
 
-    expect(titles, containsAll(['Llaves', 'Medicamentos tía', 'Botas']));
-    expect(titles.length, 3);
+    expect(titles, containsAll(['Llaves', 'Medicamentos tía']));
+    expect(titles, isNot(contains('Botas')));
+    expect(titles.length, 2);
+  });
+
+  test('con destino no mezcla ítems solo por tipo de viaje', () {
+    final templates = [
+      PackingTemplateItem(
+        id: '1',
+        title: 'Llaves',
+        tripContexts: [TripContext.everyTrip],
+      ),
+      PackingTemplateItem(
+        id: '2',
+        title: 'Botas',
+        tripContexts: [TripContext.fieldDay],
+      ),
+      PackingTemplateItem(
+        id: '3',
+        title: 'Linterna',
+        destinationId: 'rayo',
+      ),
+    ];
+
+    final titles = PackingListBuilder.buildTitles(
+      templates: templates,
+      destinationId: 'rayo',
+      selectedContexts: {TripContext.fieldDay},
+    );
+
+    expect(titles, containsAll(['Llaves', 'Linterna']));
+    expect(titles.length, 2);
   });
 
   test('no duplica títulos', () {

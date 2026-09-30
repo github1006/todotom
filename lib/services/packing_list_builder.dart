@@ -25,6 +25,15 @@ class PackingListBuilder {
         return item.destinationId == destinationId;
       }
 
+      if (item.tripContexts.contains(TripContext.everyTrip)) {
+        return true;
+      }
+
+      // Ítems solo por tipo de viaje aplican al modo "General" (sin destino).
+      if (destinationId != null) {
+        return false;
+      }
+
       if (item.tripContexts.isEmpty) {
         return false;
       }

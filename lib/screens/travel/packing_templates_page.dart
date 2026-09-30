@@ -6,9 +6,14 @@ import '../../models/trip_context.dart';
 import '../../models/trip_destination.dart';
 
 class PackingTemplatesPage extends StatefulWidget {
-  const PackingTemplatesPage({super.key, required this.dependencies});
+  const PackingTemplatesPage({
+    super.key,
+    required this.dependencies,
+    this.initialDestinationId,
+  });
 
   final AppDependencies dependencies;
+  final String? initialDestinationId;
 
   @override
   State<PackingTemplatesPage> createState() => _PackingTemplatesPageState();
@@ -17,8 +22,10 @@ class PackingTemplatesPage extends StatefulWidget {
 class _PackingTemplatesPageState extends State<PackingTemplatesPage> {
   List<PackingTemplateItem> _items = [];
   List<TripDestination> _destinations = [];
-  String? _lastDestinationId;
+  String? _selectedDestinationId;
   bool _loading = true;
+
+  bool get _editingGlobal => _selectedDestinationId == null;
 
   @override
   void initState() {
@@ -31,11 +38,15 @@ class _PackingTemplatesPageState extends State<PackingTemplatesPage> {
     final destinations = await widget.dependencies.packingRepository.getDestinations();
     final lastDestinationId =
         await widget.dependencies.settingsRepository.getLastPackingDestinationId();
+
+    final preferred = widget.initialDestinationId ?? lastDestinationId;
+    final resolved = _resolveDestinationId(preferred, destinations);
+
     if (!mounted) return;
     setState(() {
       _items = items;
       _destinations = destinations;
-      _lastDestinationId = _resolveDestinationId(lastDestinationId, destinations);
+      _selectedDestinationId = resolved ?? (destinations.length == 1 ? destinations.first.id : resolved);
       _loading = false;
     });
   }
@@ -56,9 +67,27 @@ class _PackingTemplatesPageState extends State<PackingTemplatesPage> {
     return 'Destino';
   }
 
+  List<PackingTemplateItem> get _visibleItems {
+    if (_editingGlobal) {
+      return _items.where((item) => !item.isDestinationSpecific).toList()
+        ..sort(_sortTemplates);
+    }
+    return _items.where((item) => item.destinationId == _selectedDestinationId).toList()
+      ..sort(_sortTemplates);
+  }
+
+  int _sortTemplates(PackingTemplateItem a, PackingTemplateItem b) {
+    final order = a.sortOrder.compareTo(b.sortOrder);
+    if (order != 0) return order;
+    return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+  }
+
   String _subtitle(PackingTemplateItem item) {
     if (item.isDestinationSpecific) {
       return 'Solo ${_destinationName(item.destinationId)}';
+    }
+    if (item.tripContexts.contains(TripContext.everyTrip)) {
+      return 'En todos los viajes';
     }
     if (item.tripContexts.isEmpty) {
       return 'Sin contexto';
@@ -66,9 +95,15 @@ class _PackingTemplatesPageState extends State<PackingTemplatesPage> {
     return item.tripContexts.map((c) => c.label).join(' · ');
   }
 
+  Future<void> _selectDestination(String? id) async {
+    setState(() => _selectedDestinationId = id);
+    await widget.dependencies.settingsRepository.setLastPackingDestinationId(id);
+  }
+
   Future<void> _edit({PackingTemplateItem? item}) async {
     final titleController = TextEditingController(text: item?.title ?? '');
-    String? destinationId = item?.destinationId ?? _lastDestinationId;
+    final destinationId = item?.destinationId ?? _selectedDestinationId;
+    final editingGlobal = destinationId == null;
     final selectedContexts = {...?item?.tripContexts};
 
     final saved = await showDialog<bool>(
@@ -82,6 +117,14 @@ class _PackingTemplatesPageState extends State<PackingTemplatesPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (!editingGlobal)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Destino: ${_destinationName(destinationId)}',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
                   TextField(
                     controller: titleController,
                     decoration: const InputDecoration(
@@ -90,40 +133,45 @@ class _PackingTemplatesPageState extends State<PackingTemplatesPage> {
                     ),
                     textCapitalization: TextCapitalization.sentences,
                   ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String?>(
-                    initialValue: destinationId,
-                    decoration: const InputDecoration(
-                      labelText: 'Destino específico (opcional)',
-                      border: OutlineInputBorder(),
+                  if (editingGlobal) ...[
+                    const SizedBox(height: 12),
+                    const Text('Cuándo aplica (viaje general sin destino fijo):'),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('En todos los viajes'),
+                      subtitle: const Text('Llaves, cargador, etc.'),
+                      value: selectedContexts.contains(TripContext.everyTrip),
+                      onChanged: (checked) {
+                        setDialogState(() {
+                          if (checked == true) {
+                            selectedContexts
+                              ..clear()
+                              ..add(TripContext.everyTrip);
+                          } else {
+                            selectedContexts.remove(TripContext.everyTrip);
+                          }
+                        });
+                      },
                     ),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('Cualquier destino')),
-                      ..._destinations.map(
-                        (d) => DropdownMenuItem(value: d.id, child: Text(d.name)),
-                      ),
+                    if (!selectedContexts.contains(TripContext.everyTrip)) ...[
+                      const Text('O solo según tipo de viaje:'),
+                      ...TripContext.values.where((c) => c != TripContext.everyTrip).map(
+                            (tripContext) => CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(tripContext.label),
+                              value: selectedContexts.contains(tripContext),
+                              onChanged: (checked) {
+                                setDialogState(() {
+                                  if (checked == true) {
+                                    selectedContexts.add(tripContext);
+                                  } else {
+                                    selectedContexts.remove(tripContext);
+                                  }
+                                });
+                              },
+                            ),
+                          ),
                     ],
-                    onChanged: (value) => setDialogState(() => destinationId = value),
-                  ),
-                  if (destinationId == null) ...[
-                    const SizedBox(height: 8),
-                    const Text('Tipo de viaje (si no es por destino):'),
-                    ...TripContext.values.map(
-                      (tripContext) => CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(tripContext.label),
-                        value: selectedContexts.contains(tripContext),
-                        onChanged: (checked) {
-                          setDialogState(() {
-                            if (checked == true) {
-                              selectedContexts.add(tripContext);
-                            } else {
-                              selectedContexts.remove(tripContext);
-                            }
-                          });
-                        },
-                      ),
-                    ),
                   ],
                 ],
               ),
@@ -133,6 +181,11 @@ class _PackingTemplatesPageState extends State<PackingTemplatesPage> {
               FilledButton(
                 onPressed: () {
                   if (titleController.text.trim().isEmpty) return;
+                  if (editingGlobal &&
+                      !selectedContexts.contains(TripContext.everyTrip) &&
+                      selectedContexts.isEmpty) {
+                    return;
+                  }
                   Navigator.pop(context, true);
                 },
                 child: const Text('Guardar'),
@@ -148,14 +201,13 @@ class _PackingTemplatesPageState extends State<PackingTemplatesPage> {
     final template = PackingTemplateItem(
       id: item?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
       title: titleController.text.trim(),
-      destinationId: destinationId,
-      tripContexts: destinationId == null ? selectedContexts.toList() : const [],
+      destinationId: editingGlobal ? null : destinationId,
+      tripContexts: editingGlobal ? selectedContexts.toList() : const [],
     );
 
     await widget.dependencies.packingRepository.upsertTemplateItem(template);
     await widget.dependencies.settingsRepository.setLastPackingDestinationId(destinationId);
     if (!mounted) return;
-    setState(() => _lastDestinationId = destinationId);
     await _load();
   }
 
@@ -166,38 +218,111 @@ class _PackingTemplatesPageState extends State<PackingTemplatesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final visible = _visibleItems;
+    final headerLabel = _editingGlobal
+        ? 'Cosas en todos los viajes'
+        : 'Plantilla para ${_destinationName(_selectedDestinationId)}';
+
     return Scaffold(
       appBar: AppBar(title: const Text('Plantillas maleta')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _items.isEmpty
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text('¿Para qué destino?', style: theme.textTheme.titleSmall),
+                ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: const Text('Todos los viajes'),
+                          selected: _editingGlobal,
+                          onSelected: (selected) {
+                            if (selected) _selectDestination(null);
+                          },
+                        ),
+                      ),
+                      ..._destinations.map(
+                        (d) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(d.name),
+                            selected: _selectedDestinationId == d.id,
+                            onSelected: (selected) {
+                              if (selected) _selectDestination(d.id);
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Text(
+                    headerLabel,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                if (!_editingGlobal)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'Añade ítems o usa “Cargar ejemplos” en la pantalla anterior.',
-                      textAlign: TextAlign.center,
+                      'Estos ítems solo aparecen cuando eliges este destino en Maleta.',
+                      style: theme.textTheme.bodySmall,
                     ),
                   ),
-                )
-              : ListView.builder(
-                  itemCount: _items.length,
-                  itemBuilder: (context, index) {
-                    final item = _items[index];
-                    return ListTile(
-                      leading: const Icon(Icons.inventory_2_outlined),
-                      title: Text(item.title),
-                      subtitle: Text(_subtitle(item)),
-                      onTap: () => _edit(item: item),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _delete(item),
-                      ),
-                    );
-                  },
+                if (_editingGlobal)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'Se suman a cualquier destino (o al modo General en Maleta).',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: visible.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              _destinations.isEmpty
+                                  ? 'Primero crea destinos en Menú → Destinos, o usa “Cargar ejemplos”.'
+                                  : 'Aún no hay ítems aquí. Pulsa + para añadir.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: visible.length,
+                          itemBuilder: (context, index) {
+                            final item = visible[index];
+                            return ListTile(
+                              leading: const Icon(Icons.inventory_2_outlined),
+                              title: Text(item.title),
+                              subtitle: Text(_subtitle(item)),
+                              onTap: () => _edit(item: item),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () => _delete(item),
+                              ),
+                            );
+                          },
+                        ),
                 ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _edit(),
+        onPressed: _destinations.isEmpty && !_editingGlobal ? null : () => _edit(),
         icon: const Icon(Icons.add),
         label: const Text('Ítem'),
       ),

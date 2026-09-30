@@ -288,7 +288,10 @@ class TravelHubPageState extends State<TravelHubPage> {
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
-        builder: (_) => PackingTemplatesPage(dependencies: widget.dependencies),
+        builder: (_) => PackingTemplatesPage(
+          dependencies: widget.dependencies,
+          initialDestinationId: _destinationId,
+        ),
       ),
     );
     await _refreshPreview();

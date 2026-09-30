@@ -42,12 +42,12 @@ class PackingSuggestions {
       PackingTemplateItem(
         id: 'tpl_mouse',
         title: 'Mouse',
-        tripContexts: [TripContext.cityToField, TripContext.fieldToCity],
+        destinationId: rayoRojo.id,
       ),
       PackingTemplateItem(
         id: 'tpl_botas',
         title: 'Botas',
-        tripContexts: [TripContext.cityToField, TripContext.fieldDay],
+        destinationId: rayoRojo.id,
       ),
       PackingTemplateItem(
         id: 'tpl_cinturon',
@@ -62,17 +62,17 @@ class PackingSuggestions {
       PackingTemplateItem(
         id: 'tpl_agua',
         title: 'Agua',
-        tripContexts: [TripContext.fieldDay, TripContext.cityToField],
+        destinationId: rayoRojo.id,
       ),
       PackingTemplateItem(
         id: 'tpl_gorra',
         title: 'Gorra / sombrero',
-        tripContexts: [TripContext.fieldDay],
+        destinationId: rayoRojo.id,
       ),
       PackingTemplateItem(
         id: 'tpl_documentos',
         title: 'Documentos / carnet',
-        tripContexts: [TripContext.fieldToCity, TripContext.cityToField],
+        destinationId: rayoRojo.id,
       ),
       PackingTemplateItem(
         id: 'tpl_linterna',
